@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>File Exchange</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage.js"></script>
+</head>
+<body>
+  <h1>File Exchange Platform</h1>
+  <input type="file" id="fileInput" />
+  <button id="uploadBtn">Upload</button>
+  <div id="fileList"></div>
+
+  <script>
+    // Initialize Firebase (replace with your Firebase config)
+    const firebaseConfig = {
+      apiKey: "YOUR_API_KEY",
+      authDomain: "YOUR_AUTH_DOMAIN",
+      projectId: "YOUR_PROJECT_ID",
+      storageBucket: "YOUR_STORAGE_BUCKET",
+      messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+      appId: "YOUR_APP_ID"
+    };
+    const app = firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+    const storage = firebase.storage();
+
+    const fileInput = document.getElementById('fileInput');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const fileList = document.getElementById('fileList');
+
+    // Upload file
+    uploadBtn.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      if (!file) return alert('Please select a file.');
+
+      const storageRef = storage.ref(`files/${file.name}`);
+      const uploadTask = storageRef.put(file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          console.log('Uploading:', (snapshot.bytesTransferred / snapshot.totalBytes) * 100, '%');
+        }, 
+        (error) => {
+          console.error('Upload error:', error);
+        }, 
+        async () => {
+          const downloadURL = await storageRef.getDownloadURL();
+          await db.collection('files').add({
+            name: file.name,
+            url: downloadURL,
+            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+          });
+          alert('File uploaded successfully!');
+          loadFiles();
+        }
+      );
+    });
+
+    // Load files
+    async function loadFiles() {
+      const querySnapshot = await db.collection('files').orderBy('timestamp', 'desc').get();
+      fileList.innerHTML = '';
+      querySnapshot.forEach((doc) => {
+        const file = doc.data();
+        const fileDiv = document.createElement('div');
+        fileDiv.innerHTML = `<a href="${file.url}" target="_blank">${file.name}</a>`;
+        fileList.appendChild(fileDiv);
+      });
+    }
+
+    // Load files on page load
+    loadFiles();
+  </script>
+</body>
+</html>
