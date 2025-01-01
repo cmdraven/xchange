@@ -73,6 +73,10 @@
         fileList.appendChild(fileDiv);
       });
     }
+    if (file.size > 5 * 1024 * 1024) { // 5 MB limit
+  alert('File size exceeds 5 MB.');
+  return;
+}
 
     // Load files on page load
     loadFiles();
