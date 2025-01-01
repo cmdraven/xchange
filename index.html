@@ -3,33 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>raven.org</title>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage.js"></script>
-</head>
-<body>
-  <h1>MHRaven</h1>
-  <input type="file" id="fileInput" />
-  <button id="uploadBtn">Upload</button>
-  <div id="fileList"></div>
+  <title>File Exchange</title>
+  <!-- Import Firebase libraries as modules -->
+  <script type="module">
+    // Import Firebase modules
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-app.js';
+    import { getFirestore, collection, addDoc, query, orderBy, getDocs, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore.js';
+    import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'https://www.gstatic.com/firebasejs/11.1.0/firebase-storage.js';
 
-  <script>
-    // Initialize Firebase (replace with your Firebase config)
-    // For Firebase JS SDK v7.20.0 and later, measurementId is optional
-  const firebaseConfig = {
-    apiKey: "AIzaSyD1djXxLoIRIv9T6TL2n8ezFtjIk6Jjt5w",
-    authDomain: "mimur-hurin.firebaseapp.com",
-    projectId: "mimur-hurin",
-    storageBucket: "mimur-hurin.firebasestorage.app",
-    messagingSenderId: "660179649229",
-    appId: "1:660179649229:web:7ce789b6a2e46227855f84",
-    measurementId: "G-X15VE928XK"
-  };
-    const app = firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
-    const storage = firebase.storage();
+    // Initialize Firebase
+    const firebaseConfig = {
+      apiKey: "AIzaSyD1djXxLoIRIv9T6TL2n8ezFtjIk6Jjt5w",
+      authDomain: "mimur-hurin.firebaseapp.com",
+      projectId: "mimur-hurin",
+      storageBucket: "mimur-hurin.appspot.com",
+      messagingSenderId: "660179649229",
+      appId: "1:660179649229:web:7ce789b6a2e46227855f84",
+      measurementId: "G-X15VE928XK"
+    };
 
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+    const storage = getStorage(app);
+
+    // DOM Elements
     const fileInput = document.getElementById('fileInput');
     const uploadBtn = document.getElementById('uploadBtn');
     const fileList = document.getElementById('fileList');
@@ -39,32 +36,37 @@
       const file = fileInput.files[0];
       if (!file) return alert('Please select a file.');
 
-      const storageRef = storage.ref(`files/${file.name}`);
-      const uploadTask = storageRef.put(file);
+      const storageRef = ref(storage, `files/${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      uploadTask.on('state_changed', 
+      uploadTask.on(
+        'state_changed',
         (snapshot) => {
           console.log('Uploading:', (snapshot.bytesTransferred / snapshot.totalBytes) * 100, '%');
-        }, 
+        },
         (error) => {
           console.error('Upload error:', error);
-        }, 
+        },
         async () => {
-          const downloadURL = await storageRef.getDownloadURL();
-          await db.collection('files').add({
-            name: file.name,
-            url: downloadURL,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          });
-          alert('File uploaded successfully!');
-          loadFiles();
+          const downloadURL = await getDownloadURL(storageRef);
+          try {
+            await addDoc(collection(db, 'files'), {
+              name: file.name,
+              url: downloadURL,
+              timestamp: serverTimestamp()
+            });
+            alert('File uploaded successfully!');
+          } catch (error) {
+            console.error('Error saving file metadata:', error);
+          }
         }
       );
     });
 
     // Load files
     async function loadFiles() {
-      const querySnapshot = await db.collection('files').orderBy('timestamp', 'desc').get();
+      const filesQuery = query(collection(db, 'files'), orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(filesQuery);
       fileList.innerHTML = '';
       querySnapshot.forEach((doc) => {
         const file = doc.data();
@@ -73,13 +75,26 @@
         fileList.appendChild(fileDiv);
       });
     }
-    if (file.size > 5 * 1024 * 1024) { // 5 MB limit
-  alert('File size exceeds 5 MB.');
-  return;
-}
 
-    // Load files on page load
+    // Real-time updates
+    onSnapshot(query(collection(db, 'files'), orderBy('timestamp', 'desc')), (snapshot) => {
+      fileList.innerHTML = '';
+      snapshot.forEach((doc) => {
+        const file = doc.data();
+        const fileDiv = document.createElement('div');
+        fileDiv.innerHTML = `<a href="${file.url}" target="_blank">${file.name}</a>`;
+        fileList.appendChild(fileDiv);
+      });
+    });
+
+    // Initial load
     loadFiles();
   </script>
+</head>
+<body>
+  <h1>File Exchange Platform</h1>
+  <input type="file" id="fileInput" />
+  <button id="uploadBtn">Upload</button>
+  <div id="fileList"></div>
 </body>
 </html>
